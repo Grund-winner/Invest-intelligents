@@ -2,25 +2,46 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send } from 'lucide-react';
-import type { Message } from '@/types';
+import type { Message, ConfigMap } from '@/types';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 import QuickActions from './QuickActions';
 
-const WELCOME_MESSAGE: Message = {
-  id: 'welcome',
-  role: 'assistant',
-  content:
-    "Salut ! Bienvenue chez Invest Intelligents.\n\nJe suis la pour repondre a toutes tes questions sur nos abonnements VIP, les formations, les methodes de paiement... N'hesite pas a me demander ce que tu veux savoir !",
-  timestamp: new Date(),
-};
-
 export default function ChatView() {
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [config, setConfig] = useState<ConfigMap>({});
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Fetch config on mount
+  useEffect(() => {
+    fetch('/api/config')
+      .then((res) => res.json())
+      .then((data) => {
+        setConfig(data);
+        setIsReady(true);
+        // Set welcome message with actual app name
+        const appName = data.app_name || 'Invest Intelligents';
+        setMessages([{
+          id: 'welcome',
+          role: 'assistant' as const,
+          content: `Salut ! Bienvenue chez ${appName}.\n\nJe suis la pour repondre a toutes tes questions sur nos abonnements VIP, les formations, les methodes de paiement... N'hesite pas a me demander ce que tu veux savoir !`,
+          timestamp: new Date(),
+        }]);
+      })
+      .catch(() => {
+        setIsReady(true);
+        setMessages([{
+          id: 'welcome',
+          role: 'assistant' as const,
+          content: "Salut ! Bienvenue chez Invest Intelligents.\n\nJe suis la pour repondre a toutes tes questions sur nos abonnements VIP, les formations, les methodes de paiement...",
+          timestamp: new Date(),
+        }]);
+      });
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
@@ -46,20 +67,18 @@ export default function ChatView() {
     setInput('');
     setIsTyping(true);
 
-    // Reset textarea height
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-    }
+    if (inputRef.current) inputRef.current.style.height = 'auto';
 
     try {
       const chatMessages = [...messages, userMessage]
         .map((m) => ({ role: m.role, content: m.content }))
         .filter((m) => m.id !== 'welcome');
 
+      // Send config with each request so AI always has latest values
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: chatMessages }),
+        body: JSON.stringify({ messages: chatMessages, config }),
       });
 
       const data = await res.json();
@@ -67,40 +86,28 @@ export default function ChatView() {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.content || 'Une erreur est survenue. Tu peux reessayer ?',
+        content: data.content || 'Erreur. Reessaye ?',
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch {
-      const errorMessage: Message = {
+      setMessages((prev) => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Desole, j\'ai un petit souci technique la. Tu peux reessayer ?',
+        content: 'Souci technique. Reessaye ?',
         timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      }]);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    sendMessage(input);
-  };
-
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(input);
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
   };
-
-  const handleQuickAction = (message: string) => {
-    sendMessage(message);
-  };
-
+  const handleQuickAction = (message: string) => { sendMessage(message); };
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     if (inputRef.current) {
@@ -109,9 +116,10 @@ export default function ChatView() {
     }
   };
 
+  if (!isReady) return null;
+
   return (
     <div className="flex flex-col h-full bg-[#F8F8FA]">
-      {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-4 py-5 space-y-3 scrollbar-thin">
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
@@ -120,12 +128,10 @@ export default function ChatView() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Actions */}
       <div className="px-4">
         <QuickActions onAction={handleQuickAction} />
       </div>
 
-      {/* Input Area */}
       <form onSubmit={handleSubmit} className="px-4 pb-4 pt-1.5">
         <div className="flex items-end gap-2 bg-white border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-[#D4AF37]/40 focus-within:shadow-[0_0_0_2px_rgba(212,175,55,0.08)] transition-all duration-200">
           <textarea
@@ -145,9 +151,6 @@ export default function ChatView() {
             <Send className="w-3.5 h-3.5" />
           </button>
         </div>
-        <p className="text-center text-[9px] text-gray-300 mt-1.5">
-          Invest Intelligents
-        </p>
       </form>
     </div>
   );

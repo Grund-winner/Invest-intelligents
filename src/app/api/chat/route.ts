@@ -1,25 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getAllConfigs } from '@/lib/store';
 import { buildSystemPrompt } from '@/lib/prompt';
 
-// AI Providers using OpenRouter (multiple free models for reliability)
-// If one model is rate-limited, it automatically falls back to the next
 const PROVIDERS = [
-  {
-    name: 'GLM-4.5 Air',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'z-ai/glm-4.5-air:free',
-  },
-  {
-    name: 'GPT-OSS 120B',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'openai/gpt-oss-120b:free',
-  },
-  {
-    name: 'Nemotron 120B',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'nvidia/nemotron-3-super-120b-a12b:free',
-  },
+  { name: 'GLM-4.5 Air', baseUrl: 'https://openrouter.ai/api/v1', model: 'z-ai/glm-4.5-air:free' },
+  { name: 'GPT-OSS 120B', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-oss-120b:free' },
+  { name: 'Nemotron 120B', baseUrl: 'https://openrouter.ai/api/v1', model: 'nvidia/nemotron-3-super-120b-a12b:free' },
 ];
 
 async function callProvider(
@@ -28,7 +13,7 @@ async function callProvider(
   systemPrompt: string
 ): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error('No OpenRouter API key');
+  if (!apiKey) throw new Error('No API key');
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -40,10 +25,7 @@ async function callProvider(
     },
     body: JSON.stringify({
       model: provider.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages,
-      ],
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
       temperature: 0.7,
       max_tokens: 1024,
     }),
@@ -56,40 +38,42 @@ async function callProvider(
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error(`${provider.name} returned empty content`);
+  if (!content) throw new Error(`${provider.name} returned empty`);
   return content;
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { messages } = body as { messages: Array<{ role: string; content: string }> };
+    const { messages, config } = body as {
+      messages: Array<{ role: string; content: string }>;
+      config?: Record<string, string>;
+    };
 
     if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json({ error: 'Messages array is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Messages required' }, { status: 400 });
     }
 
-    const configMap = getAllConfigs();
+    // Use config from client (always fresh from admin) or fallback to defaults
+    const configMap = config && Object.keys(config).length > 0 ? config : {};
     const systemPrompt = buildSystemPrompt(configMap);
 
-    // Try each provider in order until one succeeds
     for (const provider of PROVIDERS) {
       try {
         const content = await callProvider(provider, messages, systemPrompt);
         return NextResponse.json({ content, provider: provider.name });
       } catch (error) {
-        console.error(`Provider ${provider.name} failed:`, (error as Error).message);
+        console.error(`${provider.name} failed:`, (error as Error).message);
         continue;
       }
     }
 
-    // All providers failed
     return NextResponse.json(
-      { content: 'Tous nos services sont temporairement indisponibles. Reviens dans quelques minutes, on corrige ça vite !' },
+      { content: 'Service temporairement indisponible. Reviens dans quelques minutes.' },
       { status: 200 }
     );
   } catch (error) {
     console.error('Chat error:', error);
-    return NextResponse.json({ content: 'Oops, une petite erreur. Tu peux réessayer ?' }, { status: 200 });
+    return NextResponse.json({ content: 'Petite erreur technique. Reessaye ?' }, { status: 200 });
   }
 }
