@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAllConfigs } from '@/lib/store';
 import { buildSystemPrompt } from '@/lib/prompt';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export async function POST(request: Request) {
   try {
@@ -14,20 +15,36 @@ export async function POST(request: Request) {
     const configMap = getAllConfigs();
     const systemPrompt = buildSystemPrompt(configMap);
 
-    // Use z-ai-web-dev-sdk
-    const ZAI = (await import('z-ai-web-dev-sdk')).default;
-    const zai = await ZAI.create();
+    // Use Google Gemini AI
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { content: 'Le service IA est en cours de configuration. Reviens dans quelques minutes.' },
+        { status: 200 }
+      );
+    }
 
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages,
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+    // Convert messages to Gemini format
+    const geminiHistory = messages.slice(0, -1).map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+
+    const lastMessage = messages[messages.length - 1];
+
+    const chat = model.startChat({
+      history: [
+        { role: 'user', parts: [{ text: `Instructions système (ne réponds pas à ceci, suis juste ces instructions): ${systemPrompt}` }] },
+        { role: 'model', parts: [{ text: 'Compris, je suis un conseiller Invest Intelligents. Je vais suivre toutes ces instructions.' }] },
+        ...geminiHistory,
       ],
-      temperature: 0.7,
-      max_tokens: 1024,
     });
 
-    const content = completion.choices?.[0]?.message?.content || 'Désolé, une erreur est survenue.';
+    const result = await chat.sendMessage(lastMessage.content);
+    const content = result.response.text() || 'Désolé, une erreur est survenue.';
 
     return NextResponse.json({ content });
   } catch (error) {
