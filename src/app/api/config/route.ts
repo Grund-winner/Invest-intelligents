@@ -1,14 +1,10 @@
-import { db } from '@/lib/db';
+import { getAllConfigs, setConfig } from '@/lib/store';
 
 const ADMIN_PASSWORD = 'invest2024';
 
 export async function GET() {
   try {
-    const configs = await db.config.findMany();
-    const configMap: Record<string, string> = {};
-    for (const c of configs) {
-      configMap[c.key] = c.value;
-    }
+    const configMap = getAllConfigs();
     return Response.json(configMap);
   } catch (error) {
     console.error('Config GET error:', error);
@@ -30,13 +26,9 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Missing key or value' }, { status: 400 });
     }
 
-    const config = await db.config.upsert({
-      where: { key },
-      update: { value },
-      create: { key, value },
-    });
+    setConfig(key, value);
 
-    return Response.json(config);
+    return Response.json({ key, value, success: true });
   } catch (error) {
     console.error('Config POST error:', error);
     return Response.json({ error: 'Failed to update config' }, { status: 500 });

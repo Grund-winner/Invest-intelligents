@@ -8,8 +8,8 @@ export default function Home() {
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
-    // Seed configs on first load
-    fetch('/api/seed', { method: 'POST' }).catch(() => {});
+    // Warm up the config store
+    fetch('/api/config').catch(() => {});
   }, []);
 
   return (

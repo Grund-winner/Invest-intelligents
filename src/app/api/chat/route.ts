@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getAllConfigs } from '@/lib/store';
 import { buildSystemPrompt } from '@/lib/prompt';
 
 export async function POST(request: Request) {
@@ -11,13 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 });
     }
 
-    // Fetch all configs
-    const configs = await db.config.findMany();
-    const configMap: Record<string, string> = {};
-    for (const c of configs) {
-      configMap[c.key] = c.value;
-    }
-
+    const configMap = getAllConfigs();
     const systemPrompt = buildSystemPrompt(configMap);
 
     // Use z-ai-web-dev-sdk
