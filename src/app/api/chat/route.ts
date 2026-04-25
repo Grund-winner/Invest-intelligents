@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAllConfigs } from '@/lib/store';
 import { buildSystemPrompt } from '@/lib/prompt';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
 export async function POST(request: Request) {
   try {
@@ -15,8 +15,7 @@ export async function POST(request: Request) {
     const configMap = getAllConfigs();
     const systemPrompt = buildSystemPrompt(configMap);
 
-    // Use Google Gemini AI
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
         { content: 'Le service IA est en cours de configuration. Reviens dans quelques minutes.' },
@@ -24,27 +23,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const groq = new Groq({ apiKey });
 
-    // Convert messages to Gemini format
-    const geminiHistory = messages.slice(0, -1).map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-
-    const lastMessage = messages[messages.length - 1];
-
-    const chat = model.startChat({
-      history: [
-        { role: 'user', parts: [{ text: `Instructions système (ne réponds pas à ceci, suis juste ces instructions): ${systemPrompt}` }] },
-        { role: 'model', parts: [{ text: 'Compris, je suis un conseiller Invest Intelligents. Je vais suivre toutes ces instructions.' }] },
-        ...geminiHistory,
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages,
       ],
+      temperature: 0.7,
+      max_tokens: 1024,
     });
 
-    const result = await chat.sendMessage(lastMessage.content);
-    const content = result.response.text() || 'Désolé, une erreur est survenue.';
+    const content = completion.choices?.[0]?.message?.content || 'Désolé, une erreur est survenue.';
 
     return NextResponse.json({ content });
   } catch (error) {
