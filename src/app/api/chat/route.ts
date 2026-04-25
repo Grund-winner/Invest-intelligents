@@ -2,26 +2,23 @@ import { NextResponse } from 'next/server';
 import { getAllConfigs } from '@/lib/store';
 import { buildSystemPrompt } from '@/lib/prompt';
 
-// AI Providers configuration (OpenAI-compatible API format)
-// Uses free models from multiple providers for reliability
+// AI Providers using OpenRouter (multiple free models for reliability)
+// If one model is rate-limited, it automatically falls back to the next
 const PROVIDERS = [
   {
-    name: 'OpenRouter',
+    name: 'GLM-4.5 Air',
     baseUrl: 'https://openrouter.ai/api/v1',
-    apiKeyEnv: 'OPENROUTER_API_KEY',
-    model: 'google/gemma-3-27b-it:free',
+    model: 'z-ai/glm-4.5-air:free',
   },
   {
-    name: 'Cerebras',
-    baseUrl: 'https://api.cerebras.ai/v1',
-    apiKeyEnv: 'CEREBRAS_API_KEY',
-    model: 'llama-3.3-70b',
+    name: 'GPT-OSS 120B',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'openai/gpt-oss-120b:free',
   },
   {
-    name: 'Together',
-    baseUrl: 'https://api.together.xyz/v1',
-    apiKeyEnv: 'TOGETHER_API_KEY',
-    model: 'meta-llama/Llama-3-8b-chat-hf',
+    name: 'Nemotron 120B',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'nvidia/nemotron-3-super-120b-a12b:free',
   },
 ];
 
@@ -30,17 +27,16 @@ async function callProvider(
   messages: Array<{ role: string; content: string }>,
   systemPrompt: string
 ): Promise<string> {
-  const apiKey = process.env[provider.apiKeyEnv];
-  if (!apiKey) throw new Error(`No API key for ${provider.name}`);
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('No OpenRouter API key');
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
-      ...(provider.name === 'OpenRouter'
-        ? { 'HTTP-Referer': 'https://invest-intelligent.vercel.app', 'X-Title': 'Invest Intelligents' }
-        : {}),
+      'HTTP-Referer': 'https://invest-intelligents.vercel.app',
+      'X-Title': 'Invest Intelligents',
     },
     body: JSON.stringify({
       model: provider.model,
@@ -55,7 +51,7 @@ async function callProvider(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`${provider.name} API error ${response.status}: ${errorText}`);
+    throw new Error(`${provider.name} error ${response.status}: ${errorText}`);
   }
 
   const data = await response.json();
@@ -77,21 +73,17 @@ export async function POST(request: Request) {
     const systemPrompt = buildSystemPrompt(configMap);
 
     // Try each provider in order until one succeeds
-    let lastError: Error | null = null;
     for (const provider of PROVIDERS) {
       try {
         const content = await callProvider(provider, messages, systemPrompt);
         return NextResponse.json({ content, provider: provider.name });
       } catch (error) {
-        lastError = error as Error;
         console.error(`Provider ${provider.name} failed:`, (error as Error).message);
-        // Try next provider
         continue;
       }
     }
 
     // All providers failed
-    console.error('All AI providers failed:', lastError?.message);
     return NextResponse.json(
       { content: 'Tous nos services sont temporairement indisponibles. Reviens dans quelques minutes, on corrige ça vite !' },
       { status: 200 }
