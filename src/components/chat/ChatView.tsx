@@ -11,7 +11,7 @@ const WELCOME_MESSAGE: Message = {
   id: 'welcome',
   role: 'assistant',
   content:
-    "Salut ! Bienvenue chez Invest Intelligents 👋\n\nJe suis là pour répondre à toutes tes questions sur nos abonnements VIP, les formations, les méthodes de paiement... N'hésite pas à me demander ce que tu veux savoir !",
+    "Salut ! Bienvenue chez Invest Intelligents.\n\nJe suis la pour repondre a toutes tes questions sur nos abonnements VIP, les formations, les methodes de paiement... N'hesite pas a me demander ce que tu veux savoir !",
   timestamp: new Date(),
 };
 
@@ -21,7 +21,6 @@ export default function ChatView() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
@@ -47,6 +46,11 @@ export default function ChatView() {
     setInput('');
     setIsTyping(true);
 
+    // Reset textarea height
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
+
     try {
       const chatMessages = [...messages, userMessage]
         .map((m) => ({ role: m.role, content: m.content }))
@@ -63,7 +67,7 @@ export default function ChatView() {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.content || 'Oops, une petite erreur. Tu peux réessayer ?',
+        content: data.content || 'Une erreur est survenue. Tu peux reessayer ?',
         timestamp: new Date(),
       };
 
@@ -72,7 +76,7 @@ export default function ChatView() {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Désolé, j\'ai un petit souci technique là. Tu peux réessayer ?',
+        content: 'Desole, j\'ai un petit souci technique la. Tu peux reessayer ?',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -99,20 +103,16 @@ export default function ChatView() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    // Auto-resize
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
-      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + 'px';
+      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 100) + 'px';
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F5F5F5]">
+    <div className="flex flex-col h-full bg-[#F8F8FA]">
       {/* Messages Area */}
-      <div
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-thin"
-      >
+      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-3 scrollbar-thin">
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
@@ -126,27 +126,27 @@ export default function ChatView() {
       </div>
 
       {/* Input Area */}
-      <form onSubmit={handleSubmit} className="px-4 pb-4 pt-2">
-        <div className="flex items-end gap-2 bg-white border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-[#D4AF37]/50 focus-within:ring-2 focus-within:ring-[#D4AF37]/10 transition-all duration-200 shadow-sm">
+      <form onSubmit={handleSubmit} className="px-4 pb-4 pt-1.5">
+        <div className="flex items-end gap-2 bg-white border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-[#D4AF37]/40 focus-within:shadow-[0_0_0_2px_rgba(212,175,55,0.08)] transition-all duration-200">
           <textarea
             ref={inputRef}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Écrivez votre message..."
+            placeholder="Ecrire un message..."
             rows={1}
-            className="flex-1 bg-transparent text-gray-900 text-sm placeholder:text-gray-400 resize-none outline-none max-h-[120px] py-1.5 scrollbar-none"
+            className="flex-1 bg-transparent text-gray-900 text-sm placeholder:text-gray-400 resize-none outline-none max-h-[100px] py-1 scrollbar-none leading-relaxed"
           />
           <button
             type="submit"
             disabled={!input.trim() || isTyping}
-            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-gradient-to-br from-[#D4AF37] to-[#B8962E] text-white disabled:opacity-30 hover:opacity-90 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-[#D4AF37] to-[#B8962E] text-white disabled:opacity-20 hover:opacity-90 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed active:scale-90"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-3.5 h-3.5" />
           </button>
         </div>
-        <p className="text-center text-[10px] text-gray-400 mt-2">
-          Invest Intelligents — Conseiller
+        <p className="text-center text-[9px] text-gray-300 mt-1.5">
+          Invest Intelligents
         </p>
       </form>
     </div>
