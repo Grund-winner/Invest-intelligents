@@ -79,15 +79,29 @@ function renderFormattedText(text: string): React.ReactNode[] {
   let cleanText = text.replace(/https?:\/\/[^\s<>"')\]]+/g, '').trim();
   // Remove empty brackets/parentheses: (), [], ( ), [ ]
   cleanText = cleanText.replace(/\(\s*\)/g, '').replace(/\[\s*\]/g, '');
-  // Remove dangling brackets like "(-link" or "(-" or "[-" or "(:"
+  // Remove dangling brackets like "(-" or "[-" or "(:"
   cleanText = cleanText.replace(/[\(\[]\s*[:\-]?\s*$/gm, '');
-  // Clean up extra whitespace left after removal
-  cleanText = cleanText.replace(/\s{2,}/g, ' ').trim();
-  const parts = cleanText.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
-    if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) return <strong key={i} className="font-semibold">{part.slice(1, -1)}</strong>;
-    return <span key={i}>{part}</span>;
+  // Remove trailing spaces per line but PRESERVE newlines
+  cleanText = cleanText.replace(/[ \t]+$/gm, '');
+  // Collapse multiple spaces on same line only (keep newlines intact)
+  cleanText = cleanText.replace(/([^\n]) {2,}/g, '$1 ');
+  cleanText = cleanText.trim();
+
+  // Split by lines to preserve formatting
+  const lines = cleanText.split('\n');
+  return lines.map((line, lineIdx) => {
+    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    const formatted = parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) return <strong key={`b-${i}`}>{part.slice(2, -2)}</strong>;
+      if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) return <strong key={`b-${i}`}>{part.slice(1, -1)}</strong>;
+      return <span key={`s-${i}`}>{part}</span>;
+    });
+    return (
+      <React.Fragment key={`l-${lineIdx}`}>
+        {formatted}
+        {lineIdx < lines.length - 1 && '\n'}
+      </React.Fragment>
+    );
   });
 }
 
