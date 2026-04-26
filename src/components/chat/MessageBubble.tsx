@@ -10,6 +10,20 @@ interface LinkInfo {
   type: 'whatsapp' | 'telegram' | 'payment' | 'other';
 }
 
+function isChannelUrl(url: string): boolean {
+  try {
+    const lurl = url.toLowerCase();
+    // Block WhatsApp channel links
+    if (lurl.includes('whatsapp.com/channel')) return true;
+    // Block Telegram channel invite links (t.me/+...)
+    const pathname = new URL(url).pathname;
+    if (pathname.startsWith('/+')) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function extractLinks(text: string): LinkInfo[] {
   const urlRegex = /(https?:\/\/[^\s<>"')\]]+)/g;
   const links: LinkInfo[] = [];
@@ -17,6 +31,8 @@ function extractLinks(text: string): LinkInfo[] {
   const seen = new Set<string>();
   while ((match = urlRegex.exec(text)) !== null) {
     if (!seen.has(match[1])) {
+      // SKIP channel URLs - they belong on the floating button only
+      if (isChannelUrl(match[1])) continue;
       seen.add(match[1]);
       links.push({
         url: match[1],
@@ -32,18 +48,20 @@ function getLinkInfo(url: string): { text: string; type: LinkInfo['type'] } {
     const lurl = url.toLowerCase();
     const hostname = new URL(url).hostname;
 
-    if (hostname.includes('whatsapp.com') || hostname.includes('wa.me')) {
-      if (lurl.includes('channel')) return { text: 'Rejoindre la chaine WhatsApp', type: 'whatsapp' };
-      return { text: 'Contacter sur WhatsApp', type: 'whatsapp' };
-    }
-    if (hostname.includes('t.me') || hostname.includes('telegram')) {
-      return { text: 'Rejoindre Telegram', type: 'telegram' };
-    }
-    if (hostname.includes('mymaketou') || lurl.includes('paiement') || lurl.includes('payment') || lurl.includes('abonnement')) {
+    // Payment links (mymaketou store)
+    if (hostname.includes('mymaketou')) {
       if (lurl.includes('1-mois')) return { text: 'Abonnement 1 mois', type: 'payment' };
       if (lurl.includes('3-mois')) return { text: 'Abonnement 3 mois', type: 'payment' };
       if (lurl.includes('a-vie') || lurl.includes('vie')) return { text: 'Abonnement a vie', type: 'payment' };
       return { text: 'Effectuer le paiement', type: 'payment' };
+    }
+    // Direct WhatsApp contact (wa.me/number)
+    if (hostname.includes('wa.me')) {
+      return { text: 'Contacter sur WhatsApp', type: 'whatsapp' };
+    }
+    // Direct Telegram contact (t.me/username - NOT t.me/+ invite)
+    if (hostname.includes('t.me')) {
+      return { text: 'Contacter sur Telegram', type: 'telegram' };
     }
     return { text: 'Ouvrir le lien', type: 'other' };
   } catch {
