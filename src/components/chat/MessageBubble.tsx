@@ -103,6 +103,8 @@ function renderFormattedText(text: string): React.ReactNode[] {
   cleanText = cleanText.replace(/[ \t]+$/gm, '');
   // Collapse multiple spaces on same line only (keep newlines intact)
   cleanText = cleanText.replace(/([^\n]) {2,}/g, '$1 ');
+  // Limit consecutive newlines to max 2 (one blank line)
+  cleanText = cleanText.replace(/\n{3,}/g, '\n\n');
   cleanText = cleanText.trim();
 
   // Split by lines to preserve formatting
