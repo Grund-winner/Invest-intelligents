@@ -75,7 +75,14 @@ function getButtonIcon(type: LinkInfo['type']): React.ReactNode {
 }
 
 function renderFormattedText(text: string): React.ReactNode[] {
-  const cleanText = text.replace(/https?:\/\/[^\s<>"')\]]+/g, '').trim();
+  // Remove URLs first (they become buttons)
+  let cleanText = text.replace(/https?:\/\/[^\s<>"')\]]+/g, '').trim();
+  // Remove empty brackets/parentheses: (), [], ( ), [ ]
+  cleanText = cleanText.replace(/\(\s*\)/g, '').replace(/\[\s*\]/g, '');
+  // Remove dangling brackets like "(-link" or "(-" or "[-" or "(:"
+  cleanText = cleanText.replace(/[\(\[]\s*[:\-]?\s*$/gm, '');
+  // Clean up extra whitespace left after removal
+  cleanText = cleanText.replace(/\s{2,}/g, ' ').trim();
   const parts = cleanText.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;

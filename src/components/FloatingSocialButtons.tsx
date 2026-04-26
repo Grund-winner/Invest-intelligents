@@ -8,6 +8,7 @@ export default function FloatingSocialButtons() {
   const [telegramLink, setTelegramLink] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
 
   // Drag state
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -28,6 +29,14 @@ export default function FloatingSocialButtons() {
           const y = window.innerHeight - 140;
           setPos({ x, y });
         }
+      })
+      .catch(() => {});
+
+    // Fetch custom logo for floating button
+    fetch('/api/logo')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.hasLogo && data.logo) setCustomLogo(data.logo);
       })
       .catch(() => {});
   }, []);
@@ -82,16 +91,26 @@ export default function FloatingSocialButtons() {
     return () => { window.removeEventListener('touchmove', tm); window.removeEventListener('touchend', te); };
   }, [isDragging, onDragMove, onDragEnd]);
 
-  // Close expanded on outside tap
+  // Close expanded when clicking outside the button
   useEffect(() => {
-    if (!isExpanded) return;
-    const close = () => setIsExpanded(false);
+    if (!isExpanded || isDragging) return;
+    const close = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      // Only close if clicking outside the floating button area
+      if (!target.closest('[data-floating-btn]') && !target.closest('[data-sub-buttons]')) {
+        setIsExpanded(false);
+      }
+    };
     const t = setTimeout(() => {
-      document.addEventListener('touchstart', close, { once: true });
-      document.addEventListener('mousedown', close, { once: true });
-    }, 150);
-    return () => { clearTimeout(t); };
-  }, [isExpanded]);
+      document.addEventListener('mousedown', close);
+      document.addEventListener('touchstart', close);
+    }, 100);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [isExpanded, isDragging]);
 
   const handleToggle = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
@@ -109,6 +128,7 @@ export default function FloatingSocialButtons() {
       <AnimatePresence>
         {isExpanded && (
           <div
+            data-sub-buttons="true"
             className="fixed z-50 flex flex-col items-end gap-2.5"
             style={{
               right: 'auto',
@@ -157,16 +177,16 @@ export default function FloatingSocialButtons() {
         )}
       </AnimatePresence>
 
-      {/* Main draggable button */}
+      {/* Main draggable button with logo */}
       <button
+        data-floating-btn="true"
         onClick={handleToggle}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
-        className="fixed z-50 rounded-full shadow-xl flex items-center justify-center cursor-pointer outline-none select-none"
+        className="fixed z-50 rounded-full shadow-xl flex items-center justify-center cursor-pointer outline-none select-none overflow-hidden"
         style={{
           width: btnSize,
           height: btnSize,
-          background: 'linear-gradient(135deg, #D4AF37 0%, #B8962E 100%)',
           transform: `translate(${pos.x}px, ${pos.y}px)`,
           transition: 'none',
           bottom: 'auto',
@@ -178,14 +198,18 @@ export default function FloatingSocialButtons() {
         {!isExpanded && (
           <span className="absolute inset-0 rounded-full animate-ping opacity-20 bg-[#D4AF37]" style={{ animationDuration: '2.5s' }} />
         )}
-        {isExpanded ? (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="relative z-10">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+        {customLogo ? (
+          <img
+            src={customLogo}
+            alt="Logo"
+            className={`w-full h-full object-cover relative z-10 rounded-full ${isExpanded ? 'ring-2 ring-[#D4AF37] ring-offset-2' : ''}`}
+          />
         ) : (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="white" className="relative z-10">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-          </svg>
+          <img
+            src="/logo.png"
+            alt="Logo"
+            className={`w-full h-full object-cover relative z-10 rounded-full ${isExpanded ? 'ring-2 ring-[#D4AF37] ring-offset-2' : ''}`}
+          />
         )}
       </button>
     </>
