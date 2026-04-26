@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { buildSystemPrompt } from '@/lib/prompt';
 
 const PROVIDERS = [
-  { name: 'DeepSeek V3', baseUrl: 'https://openrouter.ai/api/v1', model: 'deepseek/deepseek-chat-v3-0324:free' },
+  { name: 'DeepSeek V3', baseUrl: 'https://openrouter.ai/api/v1', model: 'deepseek/deepseek-chat' },
   { name: 'Gemini 2.0 Flash', baseUrl: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.0-flash-001' },
+  { name: 'GPT-4o Mini', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini' },
   { name: 'Llama 4 Scout', baseUrl: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-4-scout:free' },
-  { name: 'Mistral Small', baseUrl: 'https://openrouter.ai/api/v1', model: 'mistralai/mistral-small-3.1-24b-instruct:free' },
 ];
 
 async function callProvider(
