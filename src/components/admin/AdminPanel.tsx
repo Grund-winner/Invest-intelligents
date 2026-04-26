@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { Lock, Shield, CreditCard, GraduationCap, Clock, Megaphone, UserPlus, Phone } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState, useCallback, useRef } from 'react';
+import { Lock, Shield, CreditCard, GraduationCap, Clock, Phone, Camera, Trash2, Save, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ConfigSection from './ConfigSection';
 import type { ConfigMap } from '@/types';
 
@@ -89,6 +89,11 @@ export default function AdminPanel() {
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [configs, setConfigs] = useState<ConfigMap>({});
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [hasLogo, setHasLogo] = useState(false);
+  const [logoSaving, setLogoSaving] = useState(false);
+  const [logoSaved, setLogoSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchConfigs = useCallback(async () => {
     try {
@@ -100,12 +105,30 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const fetchLogo = useCallback(async () => {
+    try {
+      const res = await fetch('/api/logo');
+      const data = await res.json();
+      if (data.hasLogo && data.logo) {
+        setLogoPreview(data.logo);
+        setHasLogo(true);
+      } else {
+        setLogoPreview(null);
+        setHasLogo(false);
+      }
+    } catch {
+      setLogoPreview(null);
+      setHasLogo(false);
+    }
+  }, []);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
       setPasswordError('');
       void fetchConfigs();
+      void fetchLogo();
     } else {
       setPasswordError('Mot de passe incorrect');
     }
@@ -123,6 +146,79 @@ export default function AdminPanel() {
 
     if (res.ok) {
       setConfigs((prev) => ({ ...prev, [key]: value }));
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) return;
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('L\'image est trop volumineuse. Maximum 2 MB.');
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      setLogoPreview(base64);
+      setLogoSaving(true);
+
+      try {
+        const res = await fetch('/api/logo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-password': ADMIN_PASSWORD,
+          },
+          body: JSON.stringify({ logo: base64 }),
+        });
+
+        if (res.ok) {
+          setHasLogo(true);
+          setLogoSaved(true);
+          setTimeout(() => setLogoSaved(false), 2000);
+        } else {
+          const data = await res.json();
+          alert(data.error || 'Erreur lors de l\'upload');
+          setLogoPreview(null);
+        }
+      } catch {
+        alert('Erreur lors de l\'upload');
+        setLogoPreview(null);
+      } finally {
+        setLogoSaving(false);
+      }
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleLogoDelete = async () => {
+    setLogoSaving(true);
+    try {
+      const res = await fetch('/api/logo', {
+        method: 'DELETE',
+        headers: {
+          'x-admin-password': ADMIN_PASSWORD,
+        },
+      });
+
+      if (res.ok) {
+        setLogoPreview(null);
+        setHasLogo(false);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setLogoSaving(false);
     }
   };
 
@@ -187,6 +283,80 @@ export default function AdminPanel() {
 
       {/* Content */}
       <div className="px-4 py-4 space-y-3">
+        {/* Logo Upload Section */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center flex-shrink-0">
+                <Camera className="w-4 h-4 text-[#D4AF37]" />
+              </div>
+              <span className="text-gray-900 text-sm font-medium">Photo de profil</span>
+            </div>
+          </div>
+          <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+            <div className="flex items-center gap-4">
+              <div className="relative w-20 h-20 flex-shrink-0">
+                {logoPreview ? (
+                  <img
+                    src={logoPreview}
+                    alt="Logo"
+                    className="w-20 h-20 rounded-full object-cover ring-2 ring-[#D4AF37]/30"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#B8962E] flex items-center justify-center text-white font-bold text-lg ring-2 ring-[#D4AF37]/30">
+                    II
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 flex-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={logoSaving}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] text-xs font-semibold transition-all duration-200 cursor-pointer disabled:opacity-40 active:scale-95"
+                >
+                  {logoSaved ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-emerald-500">Enregistre</span>
+                    </>
+                  ) : logoSaving ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>
+                      <span>Envoi en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Importer une image</span>
+                    </>
+                  )}
+                </button>
+                {hasLogo && (
+                  <button
+                    onClick={handleLogoDelete}
+                    disabled={logoSaving}
+                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 text-xs font-medium transition-all duration-200 cursor-pointer disabled:opacity-40 active:scale-95"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Supprimer</span>
+                  </button>
+                )}
+                <p className="text-[10px] text-gray-400 leading-relaxed">
+                  PNG, JPG ou WebP. Max 2 MB. Cette image remplacera le logo dans le header du chat.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Config sections */}
         {sections.map((section) => (
           <ConfigSection
             key={section.title}

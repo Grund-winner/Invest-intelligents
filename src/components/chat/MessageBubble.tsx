@@ -27,47 +27,6 @@ function extractLinks(text: string): LinkInfo[] {
   return links;
 }
 
-// Also generate contact buttons from config text (phone numbers, @handles)
-function extractContactButtons(text: string): LinkInfo[] {
-  const buttons: LinkInfo[] = [];
-  
-  // WhatsApp phone number: match patterns like "2250596855162" or "+225 05..."
-  const phonePatterns = [
-    /(?:WhatsApp|whatsapp)[:\s]*(\+?[\d\s]{8,15})/gi,
-    /(\d{10,15})/g,
-  ];
-  
-  for (const pattern of phonePatterns) {
-    let m;
-    while ((m = pattern.exec(text)) !== null) {
-      const phone = m[1].replace(/\s/g, '');
-      if (phone.length >= 8 && phone.length <= 15) {
-        buttons.push({
-          text: 'Contacter sur WhatsApp',
-          url: `https://wa.me/${phone}`,
-          type: 'whatsapp',
-        });
-      }
-    }
-  }
-  
-  // Telegram handle: @username
-  const tgPattern = /(?:Telegram|telegram|@)\s*@?([a-zA-Z]\w{3,30})/gi;
-  let tgMatch;
-  while ((tgMatch = tgPattern.exec(text)) !== null) {
-    const handle = tgMatch[1];
-    if (handle.length >= 3) {
-      buttons.push({
-        text: `Contacter @${handle}`,
-        url: `https://t.me/${handle}`,
-        type: 'telegram',
-      });
-    }
-  }
-  
-  return buttons;
-}
-
 function getLinkInfo(url: string): { text: string; type: LinkInfo['type'] } {
   try {
     const lurl = url.toLowerCase();
@@ -94,10 +53,10 @@ function getLinkInfo(url: string): { text: string; type: LinkInfo['type'] } {
 
 function getButtonStyle(type: LinkInfo['type']): string {
   switch (type) {
-    case 'whatsapp': return 'bg-[#25D366]/10 text-[#128C7E] border-[#25D366]/20 active:bg-[#25D366]/20';
-    case 'telegram': return 'bg-[#0088cc]/10 text-[#0088cc] border-[#0088cc]/20 active:bg-[#0088cc]/20';
-    case 'payment': return 'bg-[#D4AF37]/10 text-[#B8962E] border-[#D4AF37]/20 active:bg-[#D4AF37]/20';
-    default: return 'bg-gray-100 text-gray-700 border-gray-200 active:bg-gray-200';
+    case 'whatsapp': return 'bg-[#25D366] text-white active:bg-[#1da851]';
+    case 'telegram': return 'bg-[#0088cc] text-white active:bg-[#006daa]';
+    case 'payment': return 'bg-[#D4AF37] text-white active:bg-[#B8962E]';
+    default: return 'bg-gray-100 text-gray-700 active:bg-gray-200';
   }
 }
 
@@ -129,15 +88,6 @@ export default function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const urlLinks = isAssistant ? extractLinks(message.content) : [];
-  const contactLinks = isAssistant ? extractContactButtons(message.content) : [];
-
-  // Merge links, deduplicate by type+text
-  const allLinks = [...urlLinks];
-  for (const cl of contactLinks) {
-    if (!allLinks.some(l => l.type === cl.type && l.text === cl.text)) {
-      allLinks.push(cl);
-    }
-  }
 
   return (
     <motion.div
@@ -155,15 +105,15 @@ export default function MessageBubble({ message }: { message: Message }) {
           {isUser ? message.content : renderFormattedText(message.content)}
         </div>
 
-        {allLinks.length > 0 && (
+        {urlLinks.length > 0 && (
           <div className="flex flex-col gap-1.5 mt-1.5">
-            {allLinks.map((link, idx) => (
+            {urlLinks.map((link, idx) => (
               <a
                 key={idx}
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold border transition-all duration-150 ${getButtonStyle(link.type)}`}
+                className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-150 ${getButtonStyle(link.type)}`}
               >
                 {getButtonIcon(link.type)}
                 {link.text}
